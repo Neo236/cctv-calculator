@@ -14,6 +14,8 @@ class CameraGroupCard extends StatelessWidget {
     required this.resolutionOptions,
     required this.fpsOptions,
     required this.isCombinationValid, 
+    this.bitrate,
+    required this.gbPerDay,
   });
 
   final CameraGroup cameraGroup;
@@ -23,6 +25,8 @@ class CameraGroupCard extends StatelessWidget {
   final List<String> resolutionOptions;
   final List<String> fpsOptions;
   final bool isCombinationValid;
+  final int? bitrate;
+  final double gbPerDay;
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +113,45 @@ class CameraGroupCard extends StatelessWidget {
               ],
             ),
 
+            // --- AÑADE TODA ESTA NUEVA SECCIÓN ---
+            // --- RESULTADOS / ADVERTENCIA DE GRUPO ---
+            const SizedBox(height: 12),
+            if (isCombinationValid) ...[
+              // Si es válido, muestra los resultados del grupo
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    // PASO 1: Bitrate
+                    '${(bitrate! / 1024).toStringAsFixed(1)} Mbps',
+                    style: TextStyle(color: Colors.grey[400]),
+                  ),
+                  const Text('  |  ', style: TextStyle(color: Colors.grey)),
+                  Text(
+                    // PASO 2: Consumo
+                    '${gbPerDay.toStringAsFixed(1)} GB/Día',
+                    style: TextStyle(
+                        color: Colors.grey[400], fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ] else ...[
+              // Si es inválido, muestra la advertencia
+              Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.yellow[700], size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Combinación no válida.',
+                      style: TextStyle(color: Colors.yellow[700]),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            // --- FIN DE LA NUEVA SECCIÓN ---
+            
             if (!isCombinationValid) ...[
               const SizedBox(height: 12),
               Row(

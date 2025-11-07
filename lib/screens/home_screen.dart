@@ -31,10 +31,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
-
+  
+    // 1. Inicializa los controladores PRIMERO
     _diskSizeController.text = _diskSizeTB.toString();
     _activityFactorController.text = _activityFactor.toString();
+  
+    // 2. Llama a _loadData, y CUANDO TERMINE (usando .then),
+    //    ejecuta el cálculo inicial.
+    _loadData().then((_) {
+      // Esto se ejecuta DESPUÉS de que _loadData termina
+      // y _isLoading se ha puesto en false.
+      _calculate();
+    });
   }
 
   @override
@@ -113,32 +121,40 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // --- SECCIÓN DE PARÁMETROS GLOBALES ---
-                  Text('Parámetros Globales', style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 16),
-                  
-                  TextField(
-                    controller: _diskSizeController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      labelText: 'Tamaño del Disco (TB)',
-                      border: OutlineInputBorder(),
-                    ),
+                  // --- SECCIÓN DE PARÁMETROS GLOBALES (COLAPSABLE) ---
+                  ExpansionTile(
+                    title: Text('Parámetros Globales', style: Theme.of(context).textTheme.titleLarge),
+                    initiallyExpanded: true, // Para que empiece abierto
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        child: Column(
+                          children: [
+                            TextField(
+                              controller: _diskSizeController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                labelText: 'Tamaño del Disco (TB)',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _activityFactorController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                labelText: 'Factor de Actividad (%)',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-
-                  const SizedBox(height: 12),
-
-                  TextField(
-                    controller: _activityFactorController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      labelText: 'Factor de Actividad (%)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
                   const Divider(),
+                  // --- FIN DE PARÁMETROS GLOBALES ---
 
                   // --- SECCIÓN DE CÁMARAS ---
                   Row(
@@ -167,12 +183,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemBuilder: (context, index) {
                       final group = _cameraGroups[index]; // Obtenemos el grupo actual
 
-                      // Calculamos si es válido ANTES de construir la tarjeta
-                      final bool isValid = _calculatorService.getBitrate(
+                      // --- LÓGICA DE CÁLCULO POR TARJETA ---
+                      final int? bitrate = _calculatorService.getBitrate(
                         codec: group.codec,
                         resolution: group.resolution,
                         fps: group.fps,
-                      ) != null; // No es nulo = es válido
+                      );
+
+                      final bool isValid = bitrate != null;
+  
+                      // Calculamos el consumo DIARIO solo para este grupo
+                      double gbPerDayGroup = 0;
+                      if (isValid) {
+                        // Usamos la misma fórmula, pero multiplicada por la cantidad de este grupo
+                        gbPerDayGroup = (bitrate * 0.0108) * group.quantity;
+                      }
+                      // ------------------------------------
 
                       return CameraGroupCard(
                         cameraGroup: _cameraGroups[index],
@@ -180,6 +206,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         resolutionOptions: _calculatorService.resolutionOptions,
                         fpsOptions: _calculatorService.fpsOptions,
                         isCombinationValid: isValid,
+                        bitrate: bitrate,         // <-- PASO 1: Enviar Bitrate
+                        gbPerDay: gbPerDayGroup,  // <-- PASO 2: Enviar Consumo
+
                         // Callback cuando se actualiza un valor
                         onUpdate: (updatedGroup) {
                           setState(() {
@@ -216,38 +245,41 @@ class _HomeScreenState extends State<HomeScreen> {
                   
                   const SizedBox(height: 24),
 
-                  // --- SECCIÓN DE RESULTADOS ---
+                  // --- SECCIÓN DE RESULTADOS (COLAPSABLE) ---
                   if (_results.isNotEmpty) ...[
-                    Text('Resultados', style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 16),
-                    
-                    // Tarjeta de resultados
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Consumo Total (Peor Caso): ${_results['totalGbPerDay']?.toStringAsFixed(2)} GB/Día'),
-                            const SizedBox(height: 8),
-                            
-                            Text('Días Grabación (Peor Caso): ${_results['worstCaseDays']?.toStringAsFixed(1)} días'),
-                            const SizedBox(height: 12),
-                            
-                            const Divider(),
-                            const SizedBox(height: 12),
-                            
-                            Text('Días Grabación (Promedio):', style: Theme.of(context).textTheme.titleMedium),
-                            Text('${_results['averageCaseDays']?.toStringAsFixed(1)} días', 
-                                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                   color: Theme.of(context).colorScheme.primary,
-                                   fontWeight: FontWeight.bold
-                                 )),
-                          ],
+                    ExpansionTile(
+                      title: Text('Resultados', style: Theme.of(context).textTheme.titleLarge),
+                      initiallyExpanded: true, // Para que empiece abierto
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          child: Card( // La tarjeta que ya tenías
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Consumo Total (Peor Caso): ${_results['totalGbPerDay']?.toStringAsFixed(2)} GB/Día'),
+                                  const SizedBox(height: 8),
+                                  Text('Días Grabación (Peor Caso): ${_results['worstCaseDays']?.toStringAsFixed(1)} días'),
+                                  const SizedBox(height: 12),
+                                  const Divider(),
+                                  const SizedBox(height: 12),
+                                  Text('Días Grabación (Promedio):', style: Theme.of(context).textTheme.titleMedium),
+                                  Text('${_results['averageCaseDays']?.toStringAsFixed(1)} días',
+                                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                        color: Theme.of(context).colorScheme.primary,
+                                        fontWeight: FontWeight.bold
+                                      )),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ]
+                  ],
+                  // --- FIN DE RESULTADOS ---
                 ],
               ),
             ),
