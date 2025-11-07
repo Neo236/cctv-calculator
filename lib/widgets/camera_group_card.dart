@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cctv_calculator/models/camera_group.dart';
 
-class CameraGroupCard extends StatelessWidget {
+// --- CAMBIO 1: Convertido a StatefulWidget ---
+class CameraGroupCard extends StatefulWidget {
   const CameraGroupCard({
     super.key,
     required this.cameraGroup,
@@ -13,7 +14,7 @@ class CameraGroupCard extends StatelessWidget {
     required this.codecOptions,
     required this.resolutionOptions,
     required this.fpsOptions,
-    required this.isCombinationValid, 
+    required this.isCombinationValid,
     this.bitrate,
     required this.gbPerDay,
   });
@@ -29,44 +30,90 @@ class CameraGroupCard extends StatelessWidget {
   final double gbPerDay;
 
   @override
-  Widget build(BuildContext context) {
-    // Usamos un controlador temporal para el campo de cantidad
-    final quantityController = TextEditingController(
-      text: cameraGroup.quantity.toString(),
-    );
+  State<CameraGroupCard> createState() => _CameraGroupCardState();
+}
 
+class _CameraGroupCardState extends State<CameraGroupCard> {
+  // --- CAMBIO 2: Controladores movidos al Estado ---
+  late final TextEditingController _quantityController;
+  late final TextEditingController _activityFactorController;
+
+  @override
+  void initState() {
+    super.initState();
+    // Inicializa los controladores con los valores del modelo
+    _quantityController = TextEditingController(
+      text: widget.cameraGroup.quantity.toString(),
+    );
+    _activityFactorController = TextEditingController(
+      text: widget.cameraGroup.activityFactor.toString(),
+    );
+  }
+
+  @override
+  void dispose() {
+    // Limpia los controladores
+    _quantityController.dispose();
+    _activityFactorController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16.0),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Column(
           children: [
-            // --- FILA 1: CANTIDAD Y BORRAR ---
+            // --- FILA 1: CANTIDAD, ACTIVIDAD Y BORRAR ---
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Campo de Cantidad
                 SizedBox(
-                  width: 100,
+                  width: 80, // Un poco más pequeño
                   child: TextField(
-                    controller: quantityController,
+                    controller: _quantityController, // Usa el controlador de estado
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: const InputDecoration(
-                      labelText: 'Cantidad',
+                      labelText: 'Cant.', // Etiqueta más corta
                       border: OutlineInputBorder(),
                     ),
                     onChanged: (value) {
-                      // Actualiza el objeto "padre" cuando el valor cambia
                       final newQuantity = int.tryParse(value) ?? 1;
-                      onUpdate(cameraGroup..quantity = newQuantity);
+                      // Actualiza el objeto "padre"
+                      widget.onUpdate(widget.cameraGroup..quantity = newQuantity);
                     },
                   ),
                 ),
+                const SizedBox(width: 8),
+
+                // --- CAMBIO 3: AÑADIDO CAMPO DE ACTIVIDAD ---
+                SizedBox(
+                  width: 80, // Un poco más pequeño
+                  child: TextField(
+                    controller: _activityFactorController, // Usa el controlador de estado
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Activ. %', // Etiqueta más corta
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (value) {
+                      final newFactor = double.tryParse(value) ?? 40.0;
+                      // Actualiza el objeto "padre"
+                      widget.onUpdate(widget.cameraGroup..activityFactor = newFactor);
+                    },
+                  ),
+                ),
+                // ------------------------------------------
+
+                const Spacer(), // Ocupa el espacio restante
+
                 // Botón de Borrar
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                  onPressed: onDelete,
+                  onPressed: widget.onDelete,
                 ),
               ],
             ),
@@ -79,10 +126,10 @@ class CameraGroupCard extends StatelessWidget {
                 Expanded(
                   child: _buildDropdown(
                     label: 'Codec',
-                    value: cameraGroup.codec,
-                    options: codecOptions,
+                    value: widget.cameraGroup.codec,
+                    options: widget.codecOptions,
                     onChanged: (newValue) {
-                      onUpdate(cameraGroup..codec = newValue!);
+                      widget.onUpdate(widget.cameraGroup..codec = newValue!);
                     },
                   ),
                 ),
@@ -91,10 +138,10 @@ class CameraGroupCard extends StatelessWidget {
                 Expanded(
                   child: _buildDropdown(
                     label: 'Resolución',
-                    value: cameraGroup.resolution,
-                    options: resolutionOptions,
+                    value: widget.cameraGroup.resolution,
+                    options: widget.resolutionOptions,
                     onChanged: (newValue) {
-                      onUpdate(cameraGroup..resolution = newValue!);
+                      widget.onUpdate(widget.cameraGroup..resolution = newValue!);
                     },
                   ),
                 ),
@@ -103,33 +150,30 @@ class CameraGroupCard extends StatelessWidget {
                 Expanded(
                   child: _buildDropdown(
                     label: 'FPS',
-                    value: cameraGroup.fps,
-                    options: fpsOptions,
+                    value: widget.cameraGroup.fps,
+                    options: widget.fpsOptions,
                     onChanged: (newValue) {
-                      onUpdate(cameraGroup..fps = newValue!);
+                      widget.onUpdate(widget.cameraGroup..fps = newValue!);
                     },
                   ),
                 ),
               ],
             ),
 
-            // --- AÑADE TODA ESTA NUEVA SECCIÓN ---
             // --- RESULTADOS / ADVERTENCIA DE GRUPO ---
             const SizedBox(height: 12),
-            if (isCombinationValid) ...[
+            if (widget.isCombinationValid) ...[
               // Si es válido, muestra los resultados del grupo
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Text(
-                    // PASO 1: Bitrate
-                    '${(bitrate! / 1024).toStringAsFixed(1)} Mbps',
+                    '${(widget.bitrate! / 1024).toStringAsFixed(1)} Mbps',
                     style: TextStyle(color: Colors.grey[400]),
                   ),
                   const Text('  |  ', style: TextStyle(color: Colors.grey)),
                   Text(
-                    // PASO 2: Consumo
-                    '${gbPerDay.toStringAsFixed(1)} GB/Día',
+                    '${widget.gbPerDay.toStringAsFixed(1)} GB/Día',
                     style: TextStyle(
                         color: Colors.grey[400], fontWeight: FontWeight.bold),
                   ),
@@ -149,25 +193,7 @@ class CameraGroupCard extends StatelessWidget {
                   ),
                 ],
               ),
-            ],
-            // --- FIN DE LA NUEVA SECCIÓN ---
-            
-            if (!isCombinationValid) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.yellow[700], size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Combinación no válida. No se incluirá en el cálculo.',
-                      style: TextStyle(color: Colors.yellow[700]),
-                    ),
-                  ),
-                ],
-              ),
             ]
-            // ----------------------------------------
           ],
         ),
       ),
@@ -181,7 +207,9 @@ class CameraGroupCard extends StatelessWidget {
     required List<String> options,
     required ValueChanged<String?> onChanged,
   }) {
+    // ... (esta función no cambia en absoluto) ...
     return DropdownButtonFormField<String>(
+      // ignore: deprecated_member_use
       value: value,
       items: options.map((option) {
         return DropdownMenuItem(

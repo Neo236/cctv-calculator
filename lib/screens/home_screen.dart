@@ -1,8 +1,9 @@
 // lib/screens/home_screen.dart
-
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cctv_calculator/models/camera_group.dart';
 import 'package:cctv_calculator/services/calculator_service.dart';
+import 'package:cctv_calculator/services/storage_service.dart';
 import 'package:cctv_calculator/widgets/camera_group_card.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -15,13 +16,12 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   // 1. Instancia de nuestro cerebro
   final CalculatorService _calculatorService = CalculatorService();
+  final StorageService _storageService = StorageService();
 
   final TextEditingController _diskSizeController = TextEditingController();
-  final TextEditingController _activityFactorController = TextEditingController();
 
   // 2. Estado (los datos que cambian)
   double _diskSizeTB = 1.0;
-  double _activityFactor = 40.0; // 40%
   final List<CameraGroup> _cameraGroups = [CameraGroup()]; // Empezamos con un grupo de cámaras
   Map<String, double> _results = {};
 
@@ -34,7 +34,6 @@ class _HomeScreenState extends State<HomeScreen> {
   
     // 1. Inicializa los controladores PRIMERO
     _diskSizeController.text = _diskSizeTB.toString();
-    _activityFactorController.text = _activityFactor.toString();
   
     // 2. Llama a _loadData, y CUANDO TERMINE (usando .then),
     //    ejecuta el cálculo inicial.
@@ -49,7 +48,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     // Limpia los controladores cuando la pantalla se cierre
     _diskSizeController.dispose();
-    _activityFactorController.dispose();
     super.dispose();
   }
 
@@ -71,7 +69,6 @@ class _HomeScreenState extends State<HomeScreen> {
     // Usamos double.tryParse para evitar errores si el campo está vacío o mal escrito
     setState(() {
       _diskSizeTB = double.tryParse(_diskSizeController.text) ?? 1.0;
-      _activityFactor = double.tryParse(_activityFactorController.text) ?? 40.0;
     });
 
     // --- REVISIÓN DE VALIDEZ ---
@@ -97,7 +94,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final results = _calculatorService.calculateStorage(
       cameraGroups: _cameraGroups,
       diskSizeTB: _diskSizeTB,
-      activityFactorPercent: _activityFactor,
     );
     
     // Actualizamos la UI con los resultados
@@ -107,12 +103,95 @@ class _HomeScreenState extends State<HomeScreen> {
     // ---------------------------------
   }
 
+  // ... (justo después de que termine la función _calculate() )
+
+  // --- FUNCIÓN PARA GUARDAR EL PROYECTO ---
+  Future<void> _saveProject() async {
+    // Primero, actualizamos el _diskSizeTB desde el controlador
+    setState(() {
+      _diskSizeTB = double.tryParse(_diskSizeController.text) ?? 1.0;
+    });
+
+    await _storageService.saveProject(
+      cameraGroups: _cameraGroups,
+      diskSizeTB: _diskSizeTB,
+    );
+
+    // Muestra una confirmación
+    if (mounted) { // mounted es un check de seguridad de Flutter
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('¡Proyecto guardado!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  // --- FUNCIÓN PARA CARGAR EL PROYECTO ---
+  Future<void> _loadProject() async {
+    final data = await _storageService.loadProject();
+
+    if (data == null) {
+      // No hay nada que cargar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No hay ningún proyecto guardado.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // ¡Encontramos datos! Actualizamos el estado de la app
+    setState(() {
+      // 1. Actualiza los valores de estado
+      _diskSizeTB = data['diskSizeTB'] as double;
+      _cameraGroups.clear(); // Limpia la lista actual
+      _cameraGroups.addAll(data['cameraGroups'] as List<CameraGroup>);
+
+      // 2. Sincroniza los controladores de texto
+      _diskSizeController.text = _diskSizeTB.toString();
+      // (Los controladores de las tarjetas se crearán solos)
+    });
+
+    // 3. Recalcula todo con los nuevos datos
+    _calculate();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('¡Proyecto cargado!'),
+          backgroundColor: Colors.blue,
+        ),
+      );
+    }
+  }
+
   // 5. La Interfaz Gráfica
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Calculadora CCTV'),
+        // --- AÑADE ESTAS LÍNEAS ---
+        actions: [
+          // Botón de Cargar
+          IconButton(
+            icon: const Icon(Icons.folder_open),
+            tooltip: 'Cargar Proyecto',
+            onPressed: _loadProject,
+          ),
+          // Botón de Guardar
+          IconButton(
+            icon: const Icon(Icons.save),
+            tooltip: 'Guardar Proyecto',
+            onPressed: _saveProject,
+          ),
+        ],
+        // ---------------------------
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator()) // Muestra spinner si está cargando
@@ -135,15 +214,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               decoration: const InputDecoration(
                                 labelText: 'Tamaño del Disco (TB)',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _activityFactorController,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              decoration: const InputDecoration(
-                                labelText: 'Factor de Actividad (%)',
                                 border: OutlineInputBorder(),
                               ),
                             ),

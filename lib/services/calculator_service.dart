@@ -78,9 +78,9 @@ class CalculatorService {
   Map<String, double> calculateStorage({
     required List<CameraGroup> cameraGroups,
     required double diskSizeTB,
-    required double activityFactorPercent,
   }) {
-    double totalGbPerDay = 0;
+    double totalGbPerDay = 0; // Total para el "Peor Caso"
+    double totalAverageGbPerDay = 0; // Total para el "Caso Promedio"
 
     for (var group in cameraGroups) {
       final int? bitrate = getBitrate(
@@ -90,19 +90,26 @@ class CalculatorService {
       );
       // ¡Solo sumamos si el bitrate es válido!
       if (bitrate != null) { 
-        totalGbPerDay += _calculateGbPerDay(bitrate) * group.quantity;
+        // 1. Calcula el consumo del "Peor Caso" para este grupo
+        double worstGbPerGroup = _calculateGbPerDay(bitrate) * group.quantity;
+        totalGbPerDay += worstGbPerGroup;
+
+        // 2. Calcula el consumo "Promedio" para este grupo
+        //    (Peor Caso * (Factor de Actividad / 100))
+        double averageGbPerGroup = worstGbPerGroup * (group.activityFactor / 100);
+        totalAverageGbPerDay += averageGbPerGroup;
       }
     }
 
     double diskSizeGB = diskSizeTB * 1000;
     
     // Evitar división por cero
-    if (totalGbPerDay == 0 || activityFactorPercent == 0) {
+    if (totalGbPerDay == 0 || totalAverageGbPerDay == 0) {
       return {'totalGbPerDay': 0, 'worstCaseDays': 0, 'averageCaseDays': 0};
     }
 
     double worstCaseDays = diskSizeGB / totalGbPerDay;
-    double averageCaseDays = worstCaseDays / (activityFactorPercent / 100);
+    double averageCaseDays = diskSizeGB / totalAverageGbPerDay;
 
     return {
       'totalGbPerDay': totalGbPerDay,
