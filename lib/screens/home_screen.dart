@@ -16,17 +16,13 @@ class _HomeScreenState extends State<HomeScreen> {
   // 1. Instancia de nuestro cerebro
   final CalculatorService _calculatorService = CalculatorService();
 
-  final List<String> _codecOptions = ['H.265', 'H.264'];
-  final List<String> _resolutionOptions = ['1080p', '3MP', '5MP', '4K(8MP)'];
-  final List<String> _fpsOptions = ['15', '25'];
-
   final TextEditingController _diskSizeController = TextEditingController();
   final TextEditingController _activityFactorController = TextEditingController();
 
   // 2. Estado (los datos que cambian)
   double _diskSizeTB = 1.0;
   double _activityFactor = 40.0; // 40%
-  List<CameraGroup> _cameraGroups = [CameraGroup()]; // Empezamos con un grupo de cámaras
+  final List<CameraGroup> _cameraGroups = [CameraGroup()]; // Empezamos con un grupo de cámaras
   Map<String, double> _results = {};
 
   bool _isLoading = true; // Para mostrar un spinner mientras carga el JSON
@@ -69,6 +65,26 @@ class _HomeScreenState extends State<HomeScreen> {
       _diskSizeTB = double.tryParse(_diskSizeController.text) ?? 1.0;
       _activityFactor = double.tryParse(_activityFactorController.text) ?? 40.0;
     });
+
+    // --- REVISIÓN DE VALIDEZ ---
+    // Verificamos si *alguna* de las tarjetas tiene una combinación inválida
+    final bool hasInvalidGroup = _cameraGroups.any((group) {
+      final bitrate = _calculatorService.getBitrate(
+        codec: group.codec,
+        resolution: group.resolution,
+        fps: group.fps,
+      );
+      return bitrate == null; // Si es null, es inválida
+    });
+
+    // Si hay una inválida, limpiamos resultados y salimos
+    if (hasInvalidGroup) {
+      setState(() {
+        _results = {}; // Limpia los resultados para no confundir
+      });
+      return; // No calcules nada
+    }
+    // ----------------------------
 
     final results = _calculatorService.calculateStorage(
       cameraGroups: _cameraGroups,
@@ -149,15 +165,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     shrinkWrap: true, // Importante para anidar un ListView en un SingleChildScrollView
                     physics: const NeverScrollableScrollPhysics(), // Desactiva el scroll de la lista interna
                     itemBuilder: (context, index) {
+                      final group = _cameraGroups[index]; // Obtenemos el grupo actual
+
+                      // Calculamos si es válido ANTES de construir la tarjeta
+                      final bool isValid = _calculatorService.getBitrate(
+                        codec: group.codec,
+                        resolution: group.resolution,
+                        fps: group.fps,
+                      ) != null; // No es nulo = es válido
+
                       return CameraGroupCard(
                         cameraGroup: _cameraGroups[index],
-                        codecOptions: _codecOptions,
-                        resolutionOptions: _resolutionOptions,
-                        fpsOptions: _fpsOptions,
+                        codecOptions: _calculatorService.codecOptions,
+                        resolutionOptions: _calculatorService.resolutionOptions,
+                        fpsOptions: _calculatorService.fpsOptions,
+                        isCombinationValid: isValid,
                         // Callback cuando se actualiza un valor
                         onUpdate: (updatedGroup) {
                           setState(() {
                             _cameraGroups[index] = updatedGroup;
+                            _calculate(); // Recalcula automáticamente al cambiar
                           });
                         },
                         // Callback cuando se presiona borrar
@@ -166,6 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             // No permitas borrar el último grupo
                             if (_cameraGroups.length > 1) {
                               _cameraGroups.removeAt(index);
+                              _calculate(); // Recalcula automáticamente al borrar
                             }
                           });
                         },

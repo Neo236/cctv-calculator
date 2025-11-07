@@ -26,15 +26,18 @@ class CalculatorService {
     final Set<String> resolutions = {};
     final Set<String> fps = {};
 
-    // Iteramos sobre el JSON para encontrar todas las claves anidadas
-    _bitrateData.forEach((codec, resMap) {
-      (resMap as Map<String, dynamic>).forEach((res, fpsMap) {
-        resolutions.add(res); // "1080p", "3MP", "5MP", etc.
-        (fpsMap as Map<String, dynamic>).keys.forEach((f) {
-          fps.add(f); // "15", "25"
-        });
-      });
-    });
+    // Bucle 1: Reemplaza _bitrateData.forEach
+    for (var resMap in _bitrateData.values) {
+      // Bucle 2: Reemplaza resMap.forEach
+      for (var fpsMap in (resMap as Map<String, dynamic>).values) {
+        // Bucle 3: Reemplaza fpsMap.keys.forEach
+        for (var f in (fpsMap as Map<String, dynamic>).keys) {
+          fps.add(f);
+        }
+      }
+      // Agregamos las resoluciones aquí
+      resolutions.addAll((resMap).keys);
+    }
 
     // Convertimos los Sets a Listas
     resolutionOptions = resolutions.toList();
@@ -45,14 +48,14 @@ class CalculatorService {
   }
 
   // 2. Función para obtener el Bitrate
-  int getBitrate({
+  int? getBitrate({
     required String codec,
     required String resolution,
     required String fps,
   }) {
     if (!isInitialized) {
       debugPrint("Error: El servicio no está inicializado. Llama a loadBitrateData()");
-      return 0;
+      return null;
     }
     try {
       // Navega el JSON: data["H.265"]["5MP"]["15"]
@@ -60,7 +63,7 @@ class CalculatorService {
     } catch (e) {
       // Si la combinación no existe, devuelve 0
       debugPrint("Combinación no encontrada: $codec, $resolution, $fps");
-      return 0;
+      return null;
     }
   }
 
@@ -80,12 +83,15 @@ class CalculatorService {
     double totalGbPerDay = 0;
 
     for (var group in cameraGroups) {
-      int bitrate = getBitrate(
+      final int? bitrate = getBitrate(
         codec: group.codec,
         resolution: group.resolution,
         fps: group.fps,
       );
-      totalGbPerDay += _calculateGbPerDay(bitrate) * group.quantity;
+      // ¡Solo sumamos si el bitrate es válido!
+      if (bitrate != null) { 
+        totalGbPerDay += _calculateGbPerDay(bitrate) * group.quantity;
+      }
     }
 
     double diskSizeGB = diskSizeTB * 1000;

@@ -13,6 +13,7 @@ class CameraGroupCard extends StatelessWidget {
     required this.codecOptions,
     required this.resolutionOptions,
     required this.fpsOptions,
+    required this.isCombinationValid, 
   });
 
   final CameraGroup cameraGroup;
@@ -21,6 +22,7 @@ class CameraGroupCard extends StatelessWidget {
   final List<String> codecOptions;
   final List<String> resolutionOptions;
   final List<String> fpsOptions;
+  final bool isCombinationValid;
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +108,23 @@ class CameraGroupCard extends StatelessWidget {
                 ),
               ],
             ),
+
+            if (!isCombinationValid) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.yellow[700], size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Combinación no válida. No se incluirá en el cálculo.',
+                      style: TextStyle(color: Colors.yellow[700]),
+                    ),
+                  ),
+                ],
+              ),
+            ]
+            // ----------------------------------------
           ],
         ),
       ),
