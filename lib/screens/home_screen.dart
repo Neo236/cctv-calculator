@@ -1,5 +1,4 @@
 // lib/screens/home_screen.dart
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cctv_calculator/models/camera_group.dart';
 import 'package:cctv_calculator/services/calculator_service.dart';
@@ -216,6 +215,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 labelText: 'Tamaño del Disco (TB)',
                                 border: OutlineInputBorder(),
                               ),
+
+                              onChanged: (_) => _calculate(), // Recalcula al cambiar
+                              
                             ),
                             const SizedBox(height: 16),
                           ],

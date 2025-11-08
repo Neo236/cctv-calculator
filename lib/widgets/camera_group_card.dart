@@ -50,6 +50,28 @@ class _CameraGroupCardState extends State<CameraGroupCard> {
     );
   }
 
+  // --- AÑADE ESTE MÉTODO COMPLETO ---
+  @override
+  void didUpdateWidget(covariant CameraGroupCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Esta es la lógica clave:
+    // Comprueba si el texto en el controlador es DIFERENTE
+    // de los datos que vienen del "padre" (widget.cameraGroup).
+    // Si lo es, actualiza el controlador.
+
+    final String newQuantity = widget.cameraGroup.quantity.toString();
+    if (_quantityController.text != newQuantity) {
+      _quantityController.text = newQuantity;
+    }
+
+    final String newFactor = widget.cameraGroup.activityFactor.toString();
+    if (_activityFactorController.text != newFactor) {
+      _activityFactorController.text = newFactor;
+    }
+  }
+  // ---------------------------------
+
   @override
   void dispose() {
     // Limpia los controladores
